@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="id" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eksperimen Celah Ganda</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&amp;family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+html, body { height: 100%; margin: 0; }
+body { font-family: 'DM Sans', sans-serif; }
+.mono { font-family: 'Space Mono', monospace; }
+.slider-track::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 2px solid #fff;
+}
+.slider-track::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 2px solid #fff;
+}
+.slider-track { -webkit-appearance: none; height: 4px; border-radius: 2px; background: #334155; outline: none; }
+canvas { image-rendering: pixelated; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }
+.fade-up { animation: fadeUp .5s ease both; }
+.fade-up-d1 { animation-delay: .1s }
+.fade-up-d2 { animation-delay: .2s }
+.fade-up-d3 { animation-delay: .3s }
+.glow-dot { filter: blur(1px); }
+</style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full overflow-auto" style="background:#0a0e1a; --accent:#06d6a0; --bg:#0a0e1a; --surface:#111827; --text:#e2e8f0; --primary:#06d6a0; --secondary:#3b82f6;">
+  <div id="app" class="w-full min-h-full flex flex-col" style="color:var(--text);"><!-- Header -->
+   <header class="fade-up px-4 pt-5 pb-3 text-center">
+    <h1 id="mainTitle" class="text-2xl md:text-3xl font-bold tracking-tight" style="color:var(--primary);">Eksperimen Celah Ganda</h1>
+    <p class="text-sm mt-1 opacity-60">Bayangkan gelombang air melewati dua celah sempit — mereka saling bertemu dan membentuk pola unik!</p>
+   </header>
+   <div class="flex-1 flex flex-col lg:flex-row gap-3 px-3 pb-4"><!-- Left: Controls -->
+    <aside class="fade-up fade-up-d1 w-full lg:w-72 shrink-0 rounded-xl p-4 space-y-4" style="background:var(--surface); border:1px solid #1e293b;"><!-- Mode Toggle -->
+     <div class="flex rounded-lg overflow-hidden" style="border:1px solid #1e293b;"><button id="btnWave" onclick="setMode('wave')" class="flex-1 py-2 text-sm font-semibold transition-colors" style="background:var(--primary);color:#0a0e1a;"> <span id="waveLabelBtn">Gelombang</span> </button> <button id="btnParticle" onclick="setMode('particle')" class="flex-1 py-2 text-sm font-semibold transition-colors" style="background:transparent;color:var(--text);"> <span id="particleLabelBtn">Partikel</span> </button>
+     </div><!-- Play/Pause --> <button id="btnPlay" onclick="togglePlay()" class="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-colors" style="background:#1e293b;color:var(--text);"> <i data-lucide="pause" id="playIcon" style="width:16px;height:16px;"></i> <span id="playLabel">Jeda</span> </button>
+     <div class="space-y-3">
+      <div><label class="flex justify-between text-xs opacity-70 mb-1"><span>Panjang Gelombang</span><span id="valLambda" class="mono">550 nm</span></label> <input type="range" min="380" max="780" value="550" class="slider-track w-full" id="sliderLambda" oninput="updateParams()">
+      </div>
+      <div><label class="flex justify-between text-xs opacity-70 mb-1"><span>Jarak Celah</span><span id="valSlit" class="mono">0.20 mm</span></label> <input type="range" min="5" max="50" value="20" class="slider-track w-full" id="sliderSlit" oninput="updateParams()">
+      </div>
+      <div><label class="flex justify-between text-xs opacity-70 mb-1"><span>Jarak Layar</span><span id="valScreen" class="mono">1.0 m</span></label> <input type="range" min="5" max="30" value="10" class="slider-track w-full" id="sliderScreen" oninput="updateParams()">
+      </div>
+     </div><!-- Explanation Box -->
+     <div id="explainBox" class="rounded-lg p-3 text-xs leading-relaxed" style="background:#0d1321; border:1px solid #1e293b;">
+      <p><strong style="color:var(--primary);">🌊 Mode Gelombang:</strong> Gelombang menyebar dari dua celah seperti riak air. Saat puncak bertemu puncak → terang. Saat puncak bertemu lembah → gelap.</p>
+     </div><!-- Reset Particle --> <button id="btnReset" onclick="resetParticles()" class="hidden w-full py-2 rounded-lg text-xs font-semibold" style="background:#1e293b;color:var(--secondary);"> <i data-lucide="refresh-cw" style="width:14px;height:14px;display:inline;vertical-align:middle;"></i> Reset Partikel </button>
+    </aside><!-- Center: Wave Canvas -->
+    <main class="fade-up fade-up-d2 flex-1 flex flex-col gap-3 min-w-0">
+     <div class="relative rounded-xl overflow-hidden flex-1" style="background:var(--surface); border:1px solid #1e293b; min-height:300px;">
+      <canvas id="waveCanvas" class="w-full h-full"></canvas>
+      <div class="absolute top-2 left-3 text-xs opacity-40 mono">
+       Tampak Atas
+      </div>
+     </div><!-- Intensity Graph -->
+     <div class="rounded-xl overflow-hidden" style="background:var(--surface); border:1px solid #1e293b; height:140px;">
+      <canvas id="graphCanvas" class="w-full h-full"></canvas>
+     </div>
+    </main><!-- Right: Screen Pattern -->
+    <div class="fade-up fade-up-d3 w-full lg:w-28 shrink-0 rounded-xl overflow-hidden flex flex-col items-center" style="background:var(--surface); border:1px solid #1e293b;">
+     <div class="text-xs opacity-40 mono py-2">
+      Layar
+     </div>
+     <canvas id="screenCanvas" class="flex-1 w-full"></canvas>
+    </div>
+   </div>
+  </div>
+  <script>
+// --- State ---
+let mode = 'wave';
+let playing = true;
+let time = 0;
+let lambda = 550, slitDist = 20, screenDist = 10;
+let particles = [];
+let particleAccum = null;
+let animId;
+
+const waveC = document.getElementById('waveCanvas');
+const graphC = document.getElementById('graphCanvas');
+const screenC = document.getElementById('screenCanvas');
+const wCtx = waveC.getContext('2d');
+const gCtx = graphC.getContext('2d');
+const sCtx = screenC.getContext('2d');
+
+function wavelengthToRGB(wl) {
+  let r=0,g=0,b=0;
+  if(wl>=380&&wl<440){r=-(wl-440)/(440-380);b=1}
+  else if(wl>=440&&wl<490){g=(wl-440)/(490-440);b=1}
+  else if(wl>=490&&wl<510){g=1;b=-(wl-510)/(510-490)}
+  else if(wl>=510&&wl<580){r=(wl-510)/(580-510);g=1}
+  else if(wl>=580&&wl<645){r=1;g=-(wl-645)/(645-580)}
+  else if(wl>=645&&wl<=780){r=1}
+  let f=1;
+  if(wl>=380&&wl<420)f=.3+.7*(wl-380)/(420-380);
+  else if(wl>700&&wl<=780)f=.3+.7*(780-wl)/(780-700);
+  return [Math.round(r*f*255),Math.round(g*f*255),Math.round(b*f*255)];
+}
+
+function intensity(y) {
+  // Double slit intensity: I = cos²(πdy/λL) * sinc²(πay/λL)
+  const d = slitDist * 1e-4; // mm to arbitrary
+  const L = screenDist * 0.1;
+  const lam = lambda * 1e-6;
+  const arg = Math.PI * d * y / (lam * L * 8000);
+  const env = Math.PI * (d*0.15) * y / (lam * L * 8000);
+  const cosVal = Math.cos(arg);
+  const sincVal = env === 0 ? 1 : Math.sin(env)/env;
+  return cosVal * cosVal * sincVal * sincVal;
+}
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  [waveC, graphC, screenC].forEach(c => {
+    const r = c.getBoundingClientRect();
+    c.width = r.width * dpr;
+    c.height = r.height * dpr;
+    c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  });
+}
+
+function updateParams() {
+  lambda = +document.getElementById('sliderLambda').value;
+  slitDist = +document.getElementById('sliderSlit').value;
+  screenDist = +document.getElementById('sliderScreen').value;
+  document.getElementById('valLambda').textContent = lambda + ' nm';
+  document.getElementById('valSlit').textContent = (slitDist/100).toFixed(2) + ' mm';
+  document.getElementById('valScreen').textContent = (screenDist/10).toFixed(1) + ' m';
+  if(mode==='particle') resetParticles();
+}
+
+function setMode(m) {
+  mode = m;
+  const bw = document.getElementById('btnWave');
+  const bp = document.getElementById('btnParticle');
+  const eb = document.getElementById('explainBox');
+  const br = document.getElementById('btnReset');
+  if(m==='wave') {
+    bw.style.background='var(--primary)'; bw.style.color='#0a0e1a';
+    bp.style.background='transparent'; bp.style.color='var(--text)';
+    eb.innerHTML='<p><strong style="color:var(--primary);">🌊 Mode Gelombang:</strong> Gelombang menyebar dari dua celah seperti riak air. Saat puncak bertemu puncak → terang. Saat puncak bertemu lembah → gelap.</p>';
+    br.classList.add('hidden');
+  } else {
+    bp.style.background='var(--secondary)'; bp.style.color='#fff';
+    bw.style.background='transparent'; bw.style.color='var(--text)';
+    eb.innerHTML='<p><strong style="color:var(--secondary);">⚛️ Mode Partikel:</strong> Setiap "peluru" kecil ditembakkan satu per satu. Awalnya tampak acak, tapi lama-lama membentuk pola interferensi — inilah misteri dualitas gelombang-partikel!</p>';
+    br.classList.remove('hidden');
+    resetParticles();
+  }
+}
+
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('playLabel').textContent = playing ? 'Jeda' : 'Putar';
+  document.getElementById('playIcon').setAttribute('data-lucide', playing ? 'pause' : 'play');
+  lucide.createIcons();
+}
+
+function resetParticles() {
+  particles = [];
+  const r = screenC.getBoundingClientRect();
+  const h = Math.round(r.height);
+  const w = Math.round(r.width);
+  particleAccum = new Float32Array(h * w);
+}
+
+// --- Drawing ---
+function drawWave() {
+  const w = waveC.getBoundingClientRect().width;
+  const h = waveC.getBoundingClientRect().height;
+  wCtx.clearRect(0,0,w,h);
+
+  const rgb = wavelengthToRGB(lambda);
+  const sourceX = 30;
+  const barrierX = w * 0.3;
+  const cy = h / 2;
+  const gap = slitDist * 1.2;
+  const slit1Y = cy - gap;
+  const slit2Y = cy + gap;
+  const slitW = 6;
+
+  // Background
+  wCtx.fillStyle = '#0a0e1a';
+  wCtx.fillRect(0,0,w,h);
+
+  // Draw wave field
+  if(mode === 'wave') {
+    const imgData = wCtx.createImageData(Math.ceil(w), Math.ceil(h));
+    const data = imgData.data;
+    const k = 2 * Math.PI / (lambda * 0.06);
+    const omega = time * 3;
+
+    for(let px = 0; px < Math.ceil(w); px++) {
+      for(let py = 0; py < Math.ceil(h); py++) {
+        const idx = (py * Math.ceil(w) + px) * 4;
+        if(px < barrierX - 2) {
+          // Plane wave from source
+          const phase = k * (px - sourceX) - omega;
+          const val = Math.sin(phase);
+          const bright = (val + 1) / 2;
+          data[idx] = rgb[0] * bright * 0.5;
+          data[idx+1] = rgb[1] * bright * 0.5;
+          data[idx+2] = rgb[2] * bright * 0.5;
+          data[idx+3] = 100;
+        } else if(px > barrierX + slitW) {
+          // Interference from two slits
+          const d1 = Math.sqrt((px-barrierX)**2 + (py-slit1Y)**2);
+          const d2 = Math.sqrt((px-barrierX)**2 + (py-slit2Y)**2);
+          const v1 = Math.sin(k*d1 - omega) / Math.max(1, Math.sqrt(d1)*0.15);
+          const v2 = Math.sin(k*d2 - omega) / Math.max(1, Math.sqrt(d2)*0.15);
+          const val = (v1 + v2);
+          const bright = Math.min(1, Math.abs(val) / 1.5);
+          const sign = val >= 0 ? 1 : 0.4;
+          data[idx] = rgb[0] * bright * sign;
+          data[idx+1] = rgb[1] * bright * sign;
+          data[idx+2] = rgb[2] * bright * sign;
+          data[idx+3] = Math.min(255, bright * 200);
+        }
+      }
+    }
+    wCtx.putImageData(imgData, 0, 0);
+  }
+
+  // Barrier
+  wCtx.fillStyle = '#475569';
+  wCtx.fillRect(barrierX, 0, slitW, slit1Y - 4);
+  wCtx.fillRect(barrierX, slit1Y + 4, slitW, slit2Y - slit1Y - 8);
+  wCtx.fillRect(barrierX, slit2Y + 4, slitW, h - slit2Y - 4);
+
+  // Slit glow
+  wCtx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.6)`;
+  wCtx.fillRect(barrierX, slit1Y - 4, slitW, 8);
+  wCtx.fillRect(barrierX, slit2Y - 4, slitW, 8);
+
+  // Source
+  wCtx.beginPath();
+  wCtx.arc(sourceX, cy, 5, 0, Math.PI*2);
+  wCtx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+  wCtx.fill();
+
+  // Labels
+  wCtx.font = '11px DM Sans';
+  wCtx.fillStyle = '#64748b';
+  wCtx.fillText('Sumber', sourceX - 12, cy + 18);
+  wCtx.fillText('Celah', barrierX - 6, 16);
+
+  // Particle mode: flying particles
+  if(mode === 'particle') {
+    wCtx.fillStyle = '#0a0e1a';
+    wCtx.fillRect(barrierX + slitW + 1, 0, w, h);
+    // draw barrier again on top
+    wCtx.fillStyle = '#475569';
+    wCtx.fillRect(barrierX, 0, slitW, slit1Y - 4);
+    wCtx.fillRect(barrierX, slit1Y + 4, slitW, slit2Y - slit1Y - 8);
+    wCtx.fillRect(barrierX, slit2Y + 4, slitW, h - slit2Y - 4);
+
+    particles.forEach(p => {
+      if(p.x < w) {
+        wCtx.beginPath();
+        wCtx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+        wCtx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1, p.alpha)})`;
+        wCtx.fill();
+      }
+    });
+  }
+}
+
+function drawScreen() {
+  const w = screenC.getBoundingClientRect().width;
+  const h = screenC.getBoundingClientRect().height;
+  sCtx.clearRect(0,0,w,h);
+
+  const rgb = wavelengthToRGB(lambda);
+
+  if(mode === 'wave') {
+    for(let y=0; y<h; y++) {
+      const pos = (y - h/2) / h * 2;
+      const I = intensity(pos * 500);
+      sCtx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${I})`;
+      sCtx.fillRect(0, y, w, 1);
+    }
+  } else {
+    // Particle accumulation
+    sCtx.fillStyle = '#050810';
+    sCtx.fillRect(0,0,w,h);
+    if(particleAccum) {
+      const maxW = Math.round(w);
+      const maxH = Math.round(h);
+      let maxVal = 1;
+      for(let i=0;i<particleAccum.length;i++) if(particleAccum[i]>maxVal) maxVal=particleAccum[i];
+      for(let y=0;y<maxH&&y<particleAccum.length/maxW;y++){
+        for(let x=0;x<maxW;x++){
+          const v = particleAccum[y*maxW+x]/maxVal;
+          if(v>0){
+            sCtx.fillStyle=`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.min(1,v*2)})`;
+            sCtx.fillRect(x,y,1,1);
+          }
+        }
+      }
+    }
+  }
+}
+
+function drawGraph() {
+  const w = graphC.getBoundingClientRect().width;
+  const h = graphC.getBoundingClientRect().height;
+  gCtx.clearRect(0,0,w,h);
+
+  gCtx.fillStyle = '#0a0e1a';
+  gCtx.fillRect(0,0,w,h);
+
+  const rgb = wavelengthToRGB(lambda);
+
+  // Axes
+  gCtx.strokeStyle = '#1e293b';
+  gCtx.lineWidth = 1;
+  gCtx.beginPath();
+  gCtx.moveTo(40, 10); gCtx.lineTo(40, h-20); gCtx.lineTo(w-10, h-20);
+  gCtx.stroke();
+
+  // Labels
+  gCtx.font = '10px "Space Mono"';
+  gCtx.fillStyle = '#475569';
+  gCtx.save();
+  gCtx.translate(12, h/2);
+  gCtx.rotate(-Math.PI/2);
+  gCtx.fillText('Intensitas', -25, 0);
+  gCtx.restore();
+  gCtx.fillText('Posisi Layar', w/2-30, h-4);
+
+  // Intensity curve
+  gCtx.beginPath();
+  gCtx.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+  gCtx.lineWidth = 2;
+  const plotW = w - 50;
+  const plotH = h - 35;
+  for(let i=0; i<=plotW; i++){
+    const pos = (i/plotW - 0.5) * 1000;
+    const I = intensity(pos);
+    const x = 40 + i;
+    const y = (h-20) - I * plotH;
+    if(i===0) gCtx.moveTo(x,y); else gCtx.lineTo(x,y);
+  }
+  gCtx.stroke();
+
+  // Fill under curve
+  gCtx.lineTo(40+plotW, h-20);
+  gCtx.lineTo(40, h-20);
+  gCtx.closePath();
+  gCtx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.1)`;
+  gCtx.fill();
+}
+
+function spawnParticle() {
+  const sw = screenC.getBoundingClientRect().width;
+  const sh = screenC.getBoundingClientRect().height;
+  const ww = waveC.getBoundingClientRect().width;
+  const wh = waveC.getBoundingClientRect().height;
+  // Sample y from intensity distribution using rejection sampling
+  let yScreen;
+  for(let tries=0; tries<100; tries++){
+    const candidate = (Math.random()-0.5)*2;
+    const I = intensity(candidate*500);
+    if(Math.random() < I) { yScreen = candidate; break; }
+  }
+  if(yScreen === undefined) yScreen = (Math.random()-0.5)*0.1;
+
+  const targetScreenY = Math.round(sh/2 + yScreen * sh/2);
+  const targetWaveY = wh/2 + yScreen * wh/2;
+
+  // Choose random slit
+  const cy = wh/2;
+  const gap = slitDist * 1.2;
+  const slitY = Math.random() < 0.5 ? cy - gap : cy + gap;
+  const barrierX = ww * 0.3;
+
+  particles.push({
+    x: barrierX + 8,
+    y: slitY,
+    targetY: targetWaveY,
+    screenY: Math.max(0, Math.min(Math.round(sh)-1, targetScreenY)),
+    screenX: Math.floor(Math.random() * Math.max(1, Math.round(sw))),
+    speed: 2 + Math.random()*2,
+    alpha: 1,
+    landed: false
+  });
+  // Keep particle count manageable
+  if(particles.length > 200) particles = particles.filter(p => !p.landed).concat(particles.filter(p=>p.landed).slice(-50));
+}
+
+function updateParticles() {
+  const ww = waveC.getBoundingClientRect().width;
+  const sw = Math.round(screenC.getBoundingClientRect().width);
+  particles.forEach(p => {
+    if(!p.landed) {
+      p.x += p.speed;
+      const progress = (p.x - ww*0.3) / (ww - ww*0.3);
+      p.y += (p.targetY - p.y) * 0.03;
+      if(p.x >= ww - 5) {
+        p.landed = true;
+        if(particleAccum && p.screenY >= 0 && p.screenY * sw + p.screenX < particleAccum.length) {
+          particleAccum[p.screenY * sw + p.screenX] += 1;
+        }
+      }
+    }
+  });
+}
+
+let lastSpawn = 0;
+function animate(ts) {
+  if(playing) {
+    time += 0.05;
+    if(mode === 'particle') {
+      if(ts - lastSpawn > 30) {
+        for(let i=0;i<3;i++) spawnParticle();
+        lastSpawn = ts;
+      }
+      updateParticles();
+    }
+  }
+  drawWave();
+  drawScreen();
+  drawGraph();
+  animId = requestAnimationFrame(animate);
+}
+
+// --- Init ---
+window.addEventListener('resize', resize);
+resize();
+
+const defaultConfig = {
+  main_title: 'Eksperimen Celah Ganda',
+  wave_label: 'Gelombang',
+  particle_label: 'Partikel',
+  background_color: '#0a0e1a',
+  surface_color: '#111827',
+  text_color: '#e2e8f0',
+  primary_color: '#06d6a0',
+  secondary_color: '#3b82f6',
+  font_family: 'DM Sans',
+  font_size: 16
+};
+
+function applyConfig(cfg) {
+  document.getElementById('mainTitle').textContent = cfg.main_title || defaultConfig.main_title;
+  document.getElementById('waveLabelBtn').textContent = cfg.wave_label || defaultConfig.wave_label;
+  document.getElementById('particleLabelBtn').textContent = cfg.particle_label || defaultConfig.particle_label;
+
+  const root = document.documentElement;
+  const bg = cfg.background_color || defaultConfig.background_color;
+  const surface = cfg.surface_color || defaultConfig.surface_color;
+  const text = cfg.text_color || defaultConfig.text_color;
+  const primary = cfg.primary_color || defaultConfig.primary_color;
+  const secondary = cfg.secondary_color || defaultConfig.secondary_color;
+
+  document.body.style.background = bg;
+  root.style.setProperty('--bg', bg);
+  root.style.setProperty('--surface', surface);
+  root.style.setProperty('--text', text);
+  root.style.setProperty('--primary', primary);
+  root.style.setProperty('--secondary', secondary);
+  root.style.setProperty('--accent', primary);
+
+  document.getElementById('app').style.color = text;
+  document.getElementById('mainTitle').style.color = primary;
+
+  // Reapply mode button colors
+  if(mode==='wave') {
+    document.getElementById('btnWave').style.background = primary;
+  } else {
+    document.getElementById('btnParticle').style.background = secondary;
+  }
+
+  const font = cfg.font_family || defaultConfig.font_family;
+  const size = cfg.font_size || defaultConfig.font_size;
+  document.body.style.fontFamily = `${font}, DM Sans, sans-serif`;
+  document.body.style.fontSize = size + 'px';
+  document.getElementById('mainTitle').style.fontSize = (size * 1.75) + 'px';
+
+  document.querySelectorAll('[style*="background:var(--surface)"]').forEach(el => {
+    el.style.background = surface;
+  });
+}
+
+window.elementSdk.init({
+  defaultConfig,
+  onConfigChange: async (cfg) => applyConfig(cfg),
+  mapToCapabilities: (cfg) => ({
+    recolorables: [
+      { get:()=>cfg.background_color||defaultConfig.background_color, set:(v)=>{cfg.background_color=v;window.elementSdk.setConfig({background_color:v})} },
+      { get:()=>cfg.surface_color||defaultConfig.surface_color, set:(v)=>{cfg.surface_color=v;window.elementSdk.setConfig({surface_color:v})} },
+      { get:()=>cfg.text_color||defaultConfig.text_color, set:(v)=>{cfg.text_color=v;window.elementSdk.setConfig({text_color:v})} },
+      { get:()=>cfg.primary_color||defaultConfig.primary_color, set:(v)=>{cfg.primary_color=v;window.elementSdk.setConfig({primary_color:v})} },
+      { get:()=>cfg.secondary_color||defaultConfig.secondary_color, set:(v)=>{cfg.secondary_color=v;window.elementSdk.setConfig({secondary_color:v})} }
+    ],
+    borderables: [],
+    fontEditable: { get:()=>cfg.font_family||defaultConfig.font_family, set:(v)=>{cfg.font_family=v;window.elementSdk.setConfig({font_family:v})} },
+    fontSizeable: { get:()=>cfg.font_size||defaultConfig.font_size, set:(v)=>{cfg.font_size=v;window.elementSdk.setConfig({font_size:v})} }
+  }),
+  mapToEditPanelValues: (cfg) => new Map([
+    ['main_title', cfg.main_title || defaultConfig.main_title],
+    ['wave_label', cfg.wave_label || defaultConfig.wave_label],
+    ['particle_label', cfg.particle_label || defaultConfig.particle_label]
+  ])
+});
+
+applyConfig(defaultConfig);
+resetParticles();
+lucide.createIcons();
+requestAnimationFrame(animate);
+</script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9f136ebfc037229b',t:'MTc3NzAxNjE0MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
